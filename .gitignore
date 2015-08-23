@@ -30,3 +30,10 @@
 
 # Debug files
 *.dSYM/
+
+src/*.swp
+src/*.o
+*.swp
+inc/*.swp
+
+chiped
