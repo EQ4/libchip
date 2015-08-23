@@ -13,6 +13,10 @@ static uint16_t audio_frag_num;
 static uint16_t audio_rate_mul;
 static uint16_t audio_num_channels;
 
+static void (*audio_engine_ptr)(void);
+static uint32_t audio_engine_cnt;
+static uint32_t audio_engine_period;
+
 static audio_channel *audio_channels;
 
 void audio_channel_prog(audio_channel *ch)
@@ -42,16 +46,32 @@ void audio_channel_prog(audio_channel *ch)
 	}
 }
 
+// Represents creating one (1 / audio_rate) of a second of audio
 void audio_step(int16_t *frame)
 {
+
 	memset(frame, 0, sizeof(int16_t) * 2);
+	// If there's an attached sound engine, call its function
+	if (audio_engine_ptr)
+	{
+		if (audio_engine_cnt == 0)
+		{
+			audio_engine_cnt = audio_engine_period - 1;
+			audio_engine_ptr();
+		}
+		else
+		{
+			audio_engine_cnt--;
+		}
+	}
+
 	for (uint16_t i = 0; i < audio_num_channels; i++)
 	{
 		audio_channel *ch = &audio_channels[i];
 		al_lock_mutex(ch->mutex);
 		for (uint16_t chan = 0; chan < 2; chan++)
 		{
-			uint16_t frame_add = 0;
+			int16_t frame_add = 0;
 
 			// Rate multiplier is for oversampling and averaging
 			for (uint16_t k = 0; k < audio_rate_mul; k++)
@@ -59,13 +79,17 @@ void audio_step(int16_t *frame)
 				audio_channel_prog(ch);
 				frame_add += ch->wave_data[ch->wave_pos];
 			}
+			// Now we have 0-16
 			frame_add /= audio_rate_mul;
-
 			// Scale the nybble up to an 8-bit value
 			frame_add *= ch->amplitude[chan];
-			frame_add *= (1 << 7);
+				
+			// Center the wave at 0
+			frame_add -= (0xF * ch->amplitude[chan])/2;
+
+			frame_add += (frame_add + (frame_add * 0x11F)); // Bring it to 16
 			frame_add /= audio_num_channels;
-			frame[chan] += frame_add;
+			frame[chan] += (int16_t)frame_add;
 		}		
 		al_unlock_mutex(ch->mutex);
 	}
@@ -280,6 +304,11 @@ void audio_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16
 	}
 	printf("[audio] Created channel states at %X\n",(uint16_t)audio_channels);
 
+	// Set up defaults for audio engine pointer
+	audio_engine_ptr = NULL;
+	audio_engine_cnt = 0;
+	audio_engine_period = (uint32_t)(audio_rate / 60.00); // Default to 60Hz
+
 	// Build the thread
 	audio_thread = al_create_thread(audio_func, NULL);
 	printf("[audio] Created audio thread.\n");
@@ -289,6 +318,20 @@ void audio_start(void)
 {
 	al_start_thread(audio_thread);
 	printf("[audio] Started audio thread.\n");
+}
+
+void audio_set_engine_ptr(void *ptr, uint32_t p)
+{
+	audio_engine_ptr = ptr;
+	if (p)
+	{
+		audio_engine_period = p;
+	}
+}
+
+void *audio_get_engine_ptr(void)
+{
+	return audio_engine_ptr;
 }
 
 /* External control fuctions */
@@ -301,7 +344,7 @@ void audio_set_freq(uint16_t channel, float f)
 	}
 	audio_channel *ch = &audio_channels[channel];
 // Resulting frequency: (rate_mul * rate) / (wave_len * period / 2)
-	uint16_t set_p = (uint16_t)((audio_rate_mul * audio_rate) / (ch->wave_len * f / 2));
+	uint32_t set_p = (uint32_t)((audio_rate_mul * audio_rate) / (ch->wave_len * f / 2));
 	if (set_p < 1)
 	{
 		set_p = 1;
@@ -310,7 +353,7 @@ void audio_set_freq(uint16_t channel, float f)
 	printf("[audio] Set channel %d period to %d\n",channel,set_p);
 }
 
-void audio_set_period_direct(uint16_t channel, uint16_t period)
+void audio_set_period_direct(uint16_t channel, uint32_t period)
 {
 	if (channel >= audio_num_channels)
 	{
@@ -421,7 +464,7 @@ void audio_set_wave_pos(uint16_t channel, uint16_t pos)
 	ch->wave_pos = pos;
 }
 
-uint16_t audio_get_period(uint16_t channel)
+uint16_t audio_get_period(uint32_t channel)
 {
 	if (channel >= audio_num_channels)
 	{
