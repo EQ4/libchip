@@ -15,6 +15,33 @@ static uint16_t audio_num_channels;
 
 static audio_channel *audio_channels;
 
+void audio_channel_prog(audio_channel *ch)
+{
+	// Period met, increment wave pointer
+	if (ch->counter == 0)
+	{
+		// Reset period counter
+		ch->counter = ch->period - 1;
+
+		// Loop the wave if necessary
+		if (ch->wave_pos >= ch->wave_len - 1)
+		{
+			if (ch->loop_en)
+			{
+				ch->wave_pos = 0;
+			}
+		}
+		else
+		{
+			ch->wave_pos++;
+		}
+	}
+	else
+	{
+		ch->counter--;
+	}
+}
+
 void audio_step(int16_t *frame)
 {
 	memset(frame, 0, sizeof(int16_t) * 2);
@@ -22,33 +49,22 @@ void audio_step(int16_t *frame)
 	{
 		for (uint16_t i = 0; i < audio_num_channels; i++)
 		{
+			uint16_t frame_add = 0;
 			audio_channel *ch = &audio_channels[i];
+
+			// Rate multiplier is for oversampling and averaging
 			for (uint16_t k = 0; k < audio_rate_mul; k++)
 			{
-				frame[chan] += ch->wave_data[ch->wave_pos];
-				if (ch->counter != 0)
-				{
-					ch->counter--;
-				}
-				else
-				{
-					ch->counter = ch->period - 1;
-					if (ch->wave_pos == ch->wave_len)
-					{
-						if (ch->loop_en)
-						{
-							ch->wave_pos = 0;
-						}
-					}
-					else
-					{
-						ch->wave_pos++;
-					}
-				}
+				frame_add += ch->wave_data[ch->wave_pos];
+				audio_channel_prog(ch);
 			}
-			frame[chan] /= audio_rate_mul;
-			frame[chan] *= ch->amplitude[chan];
-			frame[chan] = (frame[chan] << 7) / audio_num_channels;
+			frame_add /= audio_rate_mul;
+
+			// Scale the nybble up to an 8-bit value
+			frame_add *= ch->amplitude[chan];
+			frame_add *= (1 << 7);
+			frame_add /= audio_num_channels;
+			frame[chan] += frame_add;
 		}		
 	}
 }
@@ -255,42 +271,211 @@ void audio_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16
 	printf("[audio] Created audio thread.\n");
 	al_start_thread(audio_thread);
 	printf("[audio] Started audio thread.\n");
-
-	// Test garbage
-	for (int i = 0; i < audio_num_channels; i++)
-	{
-		audio_channel *ch = &audio_channels[i];
-		ch->wave_len = 32;
-		switch (i)
-		{
-			case 0:
-
-				ch->period = 4;
-				break;
-
-			case 1:
-
-				ch->period = 900;
-				break;
-
-			case 2:
-
-				ch->period = 2000;
-				break;
-		}
-		ch->amplitude[0] = 0xF;
-		ch->amplitude[1] = 0xF;
-		ch->wave_data = (uint16_t *)malloc(sizeof(uint16_t) * ch->wave_len);
-		for (int k = 0; k < ch->wave_len; k++)
-		{
-
-			ch->wave_data[k] = k / 2;
-		}
-		ch->own_wave = 1;
-		ch->loop_en = 1;
-	}
 }
 
 /* External control fuctions */
+void audio_set_freq(uint16_t channel, float f)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return;
+	}
+	audio_channel *ch = &audio_channels[channel];
+// Resulting frequency: (rate_mul * rate) / (wave_len * period / 2)
+	uint16_t set_p = (uint16_t)((audio_rate_mul * audio_rate) / (ch->wave_len * f / 2));
+	audio_set_period_direct(channel, set_p);
+}
 
+void audio_set_period_direct(uint16_t channel, uint16_t period)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	if (period <= 1)
+	{
+		period = 1;
+	}
+	ch->period = period;
+}
 
+void audio_set_amp(uint16_t channel, uint16_t amp_l, uint16_t amp_r)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	ch->amplitude[0] = amp_l;
+	ch->amplitude[1] = amp_r;
+}
+
+void audio_set_noise(uint16_t channel, uint16_t noise_en)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	ch->noise_en = noise_en;
+}
+
+void audio_set_loop(uint16_t channel, uint16_t loop_en)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	ch->loop_en = loop_en;
+}
+
+// Point to user-owned wave data
+void audio_set_wave(uint16_t channel, uint16_t *wave_data, uint16_t len, uint16_t loop_en)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	// Clear out the previous wave if we own it
+	if (ch->own_wave && ch->wave_data)
+	{
+		free(ch->wave_data);
+		ch->wave_data = NULL;
+	}
+	ch->wave_data = wave_data;
+	ch->wave_len = len;
+	ch->loop_en = loop_en;
+	ch->own_wave = 0;
+}
+
+// Create a buffer for wave data owned by the library
+void audio_create_wave(uint16_t channel, uint16_t len, uint16_t loop_en)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	if (!len)
+	{
+		fprintf(stderr,"[audio] Error: Wave length of 0 specified. The engine may crash.\n");
+		return;
+	}
+	// Clear out the previous wave if we own it
+	if (ch->own_wave && ch->wave_data)
+	{
+		free(ch->wave_data);
+		ch->wave_data = NULL;
+	}
+	ch->wave_data = (uint16_t *)calloc(len,sizeof(uint16_t));
+	ch->own_wave = 1;
+	ch->wave_len = len;
+	ch->loop_en = loop_en;
+}
+
+void audio_set_wave_pos(uint16_t channel, uint16_t pos)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	ch->wave_pos = pos;
+}
+
+uint16_t audio_get_period(uint16_t channel)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return 0;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	return ch->period;
+}
+uint16_t audio_get_amp(uint16_t channel, uint16_t side)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return 0;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	return ch->amplitude[side % 2];
+}
+
+uint16_t audio_get_noise(uint16_t channel)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return 0;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	return ch->noise_en;
+}
+
+uint16_t audio_get_loop(uint16_t channel)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return 0;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	return ch->loop_en;
+}
+
+uint16_t *audio_get_wave(uint16_t channel)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return NULL;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	return ch->wave_data;
+}
+
+uint16_t audio_get_wave_len(uint16_t channel)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return 0;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	return ch->wave_len;
+}
+
+audio_channel *audio_get_channel(uint16_t channel)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return 0;
+	}
+	return &audio_channels[channel];
+}
+
+uint16_t audio_get_wave_pos(uint16_t channel)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return 0;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	return ch->wave_pos;
+}

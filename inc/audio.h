@@ -29,18 +29,22 @@ struct audio_channel
 void audio_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_t frag_num, uint16_t rate_mul);
 void audio_shutdown(void);
 
-void audio_set_period(uint16_t channel, uint16_t period);
+void audio_set_freq(uint16_t channel, float f);
+void audio_set_period_direct(uint16_t channel, uint16_t period);
 void audio_set_amp(uint16_t channel, uint16_t amp_l, uint16_t amp_r);
 void audio_set_noise(uint16_t channel, uint16_t noise_en);
 void audio_set_loop(uint16_t channel, uint16_t loop_en);
 void audio_set_wave(uint16_t channel, uint16_t *wave_data, uint16_t len, uint16_t loop_en);
 void audio_create_wave(uint16_t channel, uint16_t len, uint16_t loop_en);
+void audio_set_wave_pos(uint16_t channel, uint16_t pos);
 
 uint16_t audio_get_period(uint16_t channel);
 uint16_t audio_get_amp(uint16_t channel, uint16_t side);
 uint16_t audio_get_noise(uint16_t channel);
 uint16_t audio_get_loop(uint16_t channel);
 uint16_t *audio_get_wave(uint16_t channel);
+uint16_t audio_get_wave_len(uint16_t channel);
 audio_channel *audio_get_channel(uint16_t channel);
+uint16_t audio_get_wave_pos(uint16_t channel);
 
 #endif
