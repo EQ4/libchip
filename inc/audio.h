@@ -15,6 +15,7 @@
 typedef struct audio_channel audio_channel;
 struct audio_channel
 {
+	ALLEGRO_MUTEX *mutex; // Lock for reading/writing wave data
 	uint16_t period; // Division of sample rate / rate multiplier.
 	uint16_t counter; // Countdown until wave pos increment
 	uint16_t amplitude[2]; // Left and right amplitude;
@@ -26,8 +27,9 @@ struct audio_channel
 	uint16_t noise_en; // When nonzero, make LSFR noise like NES APU
 };
 
-void audio_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_t frag_num, uint16_t rate_mul);
 void audio_shutdown(void);
+void audio_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_t frag_num, uint16_t rate_mul);
+void audio_start(void);
 
 void audio_set_freq(uint16_t channel, float f);
 void audio_set_period_direct(uint16_t channel, uint16_t period);

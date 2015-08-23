@@ -45,18 +45,19 @@ void audio_channel_prog(audio_channel *ch)
 void audio_step(int16_t *frame)
 {
 	memset(frame, 0, sizeof(int16_t) * 2);
-	for (uint16_t chan = 0; chan < 2; chan++)
+	for (uint16_t i = 0; i < audio_num_channels; i++)
 	{
-		for (uint16_t i = 0; i < audio_num_channels; i++)
+		audio_channel *ch = &audio_channels[i];
+		al_lock_mutex(ch->mutex);
+		for (uint16_t chan = 0; chan < 2; chan++)
 		{
 			uint16_t frame_add = 0;
-			audio_channel *ch = &audio_channels[i];
 
 			// Rate multiplier is for oversampling and averaging
 			for (uint16_t k = 0; k < audio_rate_mul; k++)
 			{
-				frame_add += ch->wave_data[ch->wave_pos];
 				audio_channel_prog(ch);
+				frame_add += ch->wave_data[ch->wave_pos];
 			}
 			frame_add /= audio_rate_mul;
 
@@ -66,6 +67,7 @@ void audio_step(int16_t *frame)
 			frame_add /= audio_num_channels;
 			frame[chan] += frame_add;
 		}		
+		al_unlock_mutex(ch->mutex);
 	}
 }
 
@@ -138,10 +140,12 @@ void audio_shutdown(void)
 		for (uint16_t i = 0; i < audio_num_channels; i++)
 		{
 			audio_channel *ch = &audio_channels[i];
+			al_unlock_mutex(ch->mutex);
 			// Release waves if the channel owns it
 			if (ch->own_wave)
 			{
 				free(ch->wave_data);
+				al_destroy_mutex(ch->mutex);
 			}
 		}
 		free(audio_channels);
@@ -264,11 +268,25 @@ void audio_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16
 
 	// Set up channel state
 	audio_channels = (audio_channel *)calloc(audio_num_channels,sizeof(audio_channel));
+	for (int i = 0; i < num_channels; i++)
+	{
+		audio_channel *ch = &audio_channels[i];
+		ch->period = 1;
+		ch->mutex = al_create_mutex();
+		ch->wave_data = (uint16_t *)malloc(sizeof(uint16_t));
+		ch->wave_len = 1;
+		ch->own_wave = 1;
+		al_unlock_mutex(ch->mutex);
+	}
 	printf("[audio] Created channel states at %X\n",(uint16_t)audio_channels);
 
 	// Build the thread
 	audio_thread = al_create_thread(audio_func, NULL);
 	printf("[audio] Created audio thread.\n");
+}
+
+void audio_start(void)
+{
 	al_start_thread(audio_thread);
 	printf("[audio] Started audio thread.\n");
 }
@@ -284,7 +302,12 @@ void audio_set_freq(uint16_t channel, float f)
 	audio_channel *ch = &audio_channels[channel];
 // Resulting frequency: (rate_mul * rate) / (wave_len * period / 2)
 	uint16_t set_p = (uint16_t)((audio_rate_mul * audio_rate) / (ch->wave_len * f / 2));
-	audio_set_period_direct(channel, set_p);
+	if (set_p < 1)
+	{
+		set_p = 1;
+	}
+	ch->period = set_p;
+	printf("[audio] Set channel %d period to %d\n",channel,set_p);
 }
 
 void audio_set_period_direct(uint16_t channel, uint16_t period)
@@ -295,7 +318,7 @@ void audio_set_period_direct(uint16_t channel, uint16_t period)
 		return;
 	}
 	audio_channel *ch = &audio_channels[channel];
-	if (period <= 1)
+	if (period < 1)
 	{
 		period = 1;
 	}
@@ -345,6 +368,7 @@ void audio_set_wave(uint16_t channel, uint16_t *wave_data, uint16_t len, uint16_
 		return;
 	}
 	audio_channel *ch = &audio_channels[channel];
+	al_lock_mutex(ch->mutex);
 	// Clear out the previous wave if we own it
 	if (ch->own_wave && ch->wave_data)
 	{
@@ -355,6 +379,7 @@ void audio_set_wave(uint16_t channel, uint16_t *wave_data, uint16_t len, uint16_
 	ch->wave_len = len;
 	ch->loop_en = loop_en;
 	ch->own_wave = 0;
+	al_unlock_mutex(ch->mutex);
 }
 
 // Create a buffer for wave data owned by the library
@@ -366,6 +391,7 @@ void audio_create_wave(uint16_t channel, uint16_t len, uint16_t loop_en)
 		return;
 	}
 	audio_channel *ch = &audio_channels[channel];
+	al_lock_mutex(ch->mutex);
 	if (!len)
 	{
 		fprintf(stderr,"[audio] Error: Wave length of 0 specified. The engine may crash.\n");
@@ -381,6 +407,7 @@ void audio_create_wave(uint16_t channel, uint16_t len, uint16_t loop_en)
 	ch->own_wave = 1;
 	ch->wave_len = len;
 	ch->loop_en = loop_en;
+	al_unlock_mutex(ch->mutex);
 }
 
 void audio_set_wave_pos(uint16_t channel, uint16_t pos)
