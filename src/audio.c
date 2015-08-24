@@ -19,6 +19,12 @@ static uint32_t audio_engine_period;
 
 static audio_channel *audio_channels;
 
+void audio_noise_step(audio_channel *ch)
+{
+	uint16_t feedback = (ch->noise_state & 0x0001) ^ ((ch->noise_state & (1 << ch->noise_tap)) ? 1 : 0);
+	ch->noise_state = (feedback << 14) | (ch->noise_state >> 1);
+}
+
 void audio_channel_prog(audio_channel *ch)
 {
 	// Period met, increment wave pointer
@@ -26,6 +32,11 @@ void audio_channel_prog(audio_channel *ch)
 	{
 		// Reset period counter
 		ch->counter = ch->period - 1;
+
+		if (ch->noise_en)
+		{
+			audio_noise_step(ch);
+		}
 
 		// Loop the wave if necessary
 		if (ch->wave_pos >= ch->wave_len - 1)
@@ -49,7 +60,6 @@ void audio_channel_prog(audio_channel *ch)
 // Represents creating one (1 / audio_rate) of a second of audio
 void audio_step(int16_t *frame)
 {
-
 	memset(frame, 0, sizeof(int16_t) * 2);
 	// If there's an attached sound engine, call its function
 	if (audio_engine_ptr)
@@ -69,28 +79,37 @@ void audio_step(int16_t *frame)
 	{
 		audio_channel *ch = &audio_channels[i];
 		al_lock_mutex(ch->mutex);
-		for (uint16_t chan = 0; chan < 2; chan++)
+		int16_t frame_add[2];
+		frame_add[0] = 0;
+		frame_add[1] = 0;
+
+		// Rate multiplier is for oversampling and averaging
+		for (uint16_t k = 0; k < audio_rate_mul; k++)
 		{
-			int16_t frame_add = 0;
-
-			// Rate multiplier is for oversampling and averaging
-			for (uint16_t k = 0; k < audio_rate_mul; k++)
+			audio_channel_prog(ch);
+			if (ch->noise_en)
 			{
-				audio_channel_prog(ch);
-				frame_add += ch->wave_data[ch->wave_pos];
+				frame_add[0] += 0xF * (ch->noise_state & 0x0001);
 			}
+			else
+			{
+				frame_add[0] += ch->wave_data[ch->wave_pos];
+			}
+		}
+		frame_add[1] = frame_add[0];
+		for (int k = 0; k < 2; k++)
+		{
 			// Now we have 0-16
-			frame_add /= audio_rate_mul;
+			frame_add[k] /= audio_rate_mul;
 			// Scale the nybble up to an 8-bit value
-			frame_add *= ch->amplitude[chan];
-				
+			frame_add[k] *= ch->amplitude[k];
 			// Center the wave at 0
-			frame_add -= (0xF * ch->amplitude[chan])/2;
+			frame_add[k] -= (0xF * ch->amplitude[k])/2;
 
-			frame_add += (frame_add + (frame_add * 0x11F)); // Bring it to 16
-			frame_add /= audio_num_channels;
-			frame[chan] += (int16_t)frame_add;
-		}		
+			frame_add[k] += (frame_add[k] + (frame_add[k] * 0x11F)); // Bring it to 16
+			frame_add[k] /= audio_num_channels;
+			frame[k] += (int16_t)frame_add[k];
+		}
 		al_unlock_mutex(ch->mutex);
 	}
 }
@@ -300,6 +319,8 @@ void audio_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16
 		ch->wave_data = (uint16_t *)malloc(sizeof(uint16_t));
 		ch->wave_len = 1;
 		ch->own_wave = 1;
+		ch->noise_tap = 7;
+		ch->noise_state = 0x0001;
 		al_unlock_mutex(ch->mutex);
 	}
 	printf("[audio] Created channel states at %X\n",(uint16_t)audio_channels);
@@ -343,8 +364,8 @@ void audio_set_freq(uint16_t channel, float f)
 		return;
 	}
 	audio_channel *ch = &audio_channels[channel];
-// Resulting frequency: (rate_mul * rate) / (wave_len * period / 2)
-	uint32_t set_p = (uint32_t)((audio_rate_mul * audio_rate) / (ch->wave_len * f / 2));
+// Resulting frequency: (rate_mul * rate) / (wave_len * period)
+	uint32_t set_p = (uint32_t)((audio_rate_mul * audio_rate) / (ch->wave_len * f));
 	if (set_p < 1)
 	{
 		set_p = 1;
@@ -464,6 +485,21 @@ void audio_set_wave_pos(uint16_t channel, uint16_t pos)
 	ch->wave_pos = pos;
 }
 
+void audio_set_noise_tap(uint16_t channel, uint16_t tap)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	if (tap > 15)
+	{
+		tap = 0;
+	}
+	ch->noise_tap = tap;
+}
+
 uint16_t audio_get_period(uint32_t channel)
 {
 	if (channel >= audio_num_channels)
@@ -548,4 +584,16 @@ uint16_t audio_get_wave_pos(uint16_t channel)
 	}
 	audio_channel *ch = &audio_channels[channel];
 	return ch->wave_pos;
+}
+
+uint16_t audio_get_noise_tap(uint16_t channel)
+{
+	if (channel >= audio_num_channels)
+	{
+		fprintf(stderr,"[audio] Error: Channel out of range (%d > %d)\n",channel,audio_num_channels);
+		return 0;
+	}
+	audio_channel *ch = &audio_channels[channel];
+	return ch->noise_tap;
+	
 }

@@ -47,19 +47,16 @@ int main(int argc, char **argv)
 	audio_set_engine_ptr(&printme,0);
 	audio_set_wave(0, &wave_saw[0], 32, 1);
 	audio_set_amp(0,0xF,0xF);
-	audio_set_freq(0,440);
+	audio_set_freq(0,40);
+	//audio_set_noise(0,1);
 	char c = 0;
-	int started = 0;
 	int f = 32;
 	audio_start();
 	while(c != 'z')
 	{
 		c = getchar();
-		if (!started)
-		{
-			started = 1;
-		}
-		f++;
+		audio_set_freq(0,f);
+		f = f * 2;;
 	}
 	printf("%d frames\n",frames);
 	audio_shutdown();

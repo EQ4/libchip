@@ -25,6 +25,8 @@ struct audio_channel
 	uint16_t wave_pos; // Pointer within wave
 	uint16_t loop_en; // Will the wave loop at the end or stop playing?
 	uint16_t noise_en; // When nonzero, make LSFR noise like NES APU
+	uint16_t noise_state;
+	uint16_t noise_tap;
 };
 
 void audio_shutdown(void);
@@ -42,6 +44,7 @@ void audio_set_loop(uint16_t channel, uint16_t loop_en);
 void audio_set_wave(uint16_t channel, uint16_t *wave_data, uint16_t len, uint16_t loop_en);
 void audio_create_wave(uint16_t channel, uint16_t len, uint16_t loop_en);
 void audio_set_wave_pos(uint16_t channel, uint16_t pos);
+void audio_set_noise_tap(uint16_t channel, uint16_t tap);
 
 uint16_t audio_get_period(uint32_t channel);
 uint16_t audio_get_amp(uint16_t channel, uint16_t side);
@@ -51,5 +54,6 @@ uint16_t *audio_get_wave(uint16_t channel);
 uint16_t audio_get_wave_len(uint16_t channel);
 audio_channel *audio_get_channel(uint16_t channel);
 uint16_t audio_get_wave_pos(uint16_t channel);
+uint16_t audio_get_noise_tap(uint16_t channel);
 
 #endif
