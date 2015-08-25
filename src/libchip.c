@@ -13,19 +13,21 @@ static uint16_t chip_frag_num;
 static uint16_t chip_rate_mul;
 static uint16_t chip_num_channels;
 
+static int chip_is_init;
+
 static void (*chip_engine_ptr)(void);
 static uint32_t chip_engine_cnt;
 static uint32_t chip_engine_period;
 
 static chip_channel *chip_channels;
 
-void chip_noise_step(chip_channel *ch)
+static void chip_noise_step(chip_channel *ch)
 {
 	uint16_t feedback = (ch->noise_state & 0x0001) ^ ((ch->noise_state & (1 << ch->noise_tap)) ? 1 : 0);
 	ch->noise_state = (feedback << 14) | (ch->noise_state >> 1);
 }
 
-void chip_channel_prog(chip_channel *ch)
+static void chip_channel_prog(chip_channel *ch)
 {
 	// Period met, increment wave pointer
 	if (ch->counter == 0)
@@ -58,7 +60,7 @@ void chip_channel_prog(chip_channel *ch)
 }
 
 // Represents creating one (1 / chip_rate) of a second of audio
-void chip_step(int16_t *frame)
+static void chip_step(int16_t *frame)
 {
 	memset(frame, 0, sizeof(int16_t) * 2);
 	// If there's an attached sound engine, call its function
@@ -150,8 +152,11 @@ static void* chip_func(ALLEGRO_THREAD *thr, void *arg)
 	return NULL;
 }
 
+// User functions
 void chip_shutdown(void)
 {	
+	chip_num_channels = 0;
+	chip_is_init = 0;
 	if (chip_thread)
 	{
 		al_set_thread_should_stop(chip_thread);
@@ -196,16 +201,14 @@ void chip_shutdown(void)
 	}
 }
 
-void chip_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_t frag_num, uint16_t rate_mul)
+static int chip_allegro_setup(void)
 {
-	chip_shutdown();
-
 	if (!al_is_system_installed())
 	{
 		if (!al_init())
 		{
 			fprintf(stderr,"[audio] Error: Could not initialize Allegro.\n");
-			return;
+			return 0;
 		}
 	}
 	printf("[audio] Allegro is installed\n");
@@ -215,27 +218,80 @@ void chip_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_
 		if (!al_install_audio())
 		{
 			fprintf(stderr,"[audio] Error: Could not install audio addon.\n");
-			return;
+			return 0;
 		}
 	}
 	printf("[audio] Audio addon is installed\n");
+	// Voice
+	chip_voice = al_create_voice(chip_rate,
+		chip_DEPTH,
+		chip_CHAN);
+	if (!chip_voice)
+	{
+		fprintf(stderr,"[audio] Error: Failed to create voice.\n");
+		return;
+	}
+	printf("[audio] Created voice at %X\n",(uint16_t)chip_voice);
 
-	chip_rate = rate;
-	chip_num_channels = num_channels;
-	chip_frag_size = frag_size;
-	chip_frag_num = frag_num;
-	chip_rate_mul = rate_mul;
+	// Mixer
+	chip_mixer = al_create_mixer(chip_rate,
+		chip_DEPTH,
+		chip_CHAN);
+	if (!chip_mixer)
+	{
+		fprintf(stderr,"[audio] Error: Failed to create mixer.\n");
+		return 0;
+	}
+	printf("[audio] Created mixer at %X\n",(uint16_t)chip_mixer);
 
+	if (!al_attach_mixer_to_voice(chip_mixer, chip_voice))
+	{
+		fprintf(stderr,"[audio] Error: Failed to attach mixer to voice.\n");
+		return 0;
+	}
+	printf("[audio] Attached mixer to voice\n");
+
+	al_set_default_mixer(chip_mixer);
+	al_reserve_samples(chip_frag_num);
+
+	// Build stream
+	chip_stream = al_create_audio_stream(
+		chip_frag_num,
+		chip_frag_size,
+		chip_rate,
+		chip_DEPTH,
+		chip_CHAN);
+	printf("[audio] Created stream at %X\n",(uint16_t)chip_stream);
+	if (!al_attach_audio_stream_to_mixer(chip_stream, al_get_default_mixer()))
+	{
+		printf("[audio] Error: Couldn't attach stream to mixer.\n");
+		return 0;
+	}
+	printf("[audio] Attached stream to mixer.\n");
+
+	// Set up event source for the audio thread
+	chip_queue = al_create_event_queue();
+	printf("[audio] Created queue at %X\n",(uint16_t)chip_queue);
+	al_register_event_source(chip_queue, 
+		al_get_audio_stream_event_source(chip_stream));
+	printf("[audio] Registered audio event source with queue.\n");
+
+	return 1;
+
+}
+
+static int chip_arg_sanity(void)
+{
 	if (!chip_rate)
 	{
 		fprintf(stderr,"[audio] Error: Invalid sample rate specified.\n");
-		return;
+		return 0;
 	}
 	printf("[audio] Sampling rate: %dHz\n",chip_rate);
 	if (!chip_num_channels)
 	{
 		fprintf(stderr,"[audio] Error: At least one channel must be created.\n");
-		return;
+		return 0;
 	}
 	printf("[audio] Using %d channels\n",chip_num_channels);
 	if (!chip_frag_size)
@@ -255,62 +311,18 @@ void chip_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_
 		chip_rate_mul = 1;
 	}
 	printf("[audio] Rate multiplier is %d\n",chip_rate_mul);
-	// Voice
-	chip_voice = al_create_voice(chip_rate,
-		chip_DEPTH,
-		chip_CHAN);
-	if (!chip_voice)
-	{
-		fprintf(stderr,"[audio] Error: Failed to create voice.\n");
-		return;
-	}
-	printf("[audio] Created voice at %X\n",(uint16_t)chip_voice);
+	return 1;
+}
 
-	// Mixer
-	chip_mixer = al_create_mixer(chip_rate,
-		chip_DEPTH,
-		chip_CHAN);
-	if (!chip_mixer)
-	{
-		fprintf(stderr,"[audio] Error: Failed to create mixer.\n");
-		return;
-	}
-	printf("[audio] Created mixer at %X\n",(uint16_t)chip_mixer);
-
-	if (!al_attach_mixer_to_voice(chip_mixer, chip_voice))
-	{
-		fprintf(stderr,"[audio] Error: Failed to attach mixer to voice.\n");
-		return;
-	}
-	printf("[audio] Attached mixer to voice\n");
-
-	al_set_default_mixer(chip_mixer);
-	al_reserve_samples(chip_frag_num);
-
-	// Build stream
-	chip_stream = al_create_audio_stream(
-		chip_frag_num,
-		chip_frag_size,
-		chip_rate,
-		chip_DEPTH,
-		chip_CHAN);
-	printf("[audio] Created stream at %X\n",(uint16_t)chip_stream);
-	if (!al_attach_audio_stream_to_mixer(chip_stream, al_get_default_mixer()))
-	{
-		printf("[audio] Error: Couldn't attach stream to mixer.\n");
-		return;
-	}
-	printf("[audio] Attached stream to mixer.\n");
-
-	// Set up event source for the audio thread
-	chip_queue = al_create_event_queue();
-	printf("[audio] Created queue at %X\n",(uint16_t)chip_queue);
-	al_register_event_source(chip_queue, 
-		al_get_audio_stream_event_source(chip_stream));
-	printf("[audio] Registered audio event source with queue.\n");
-
+static void chip_channel_init(void)
+{
 	// Set up channel state
 	chip_channels = (chip_channel *)calloc(chip_num_channels,sizeof(chip_channel));
+	if (!chip_channels)
+	{
+		fprintf(stderr,"[audio] Couldn't malloc for channel states. Maybe too many have been requested?\n");
+		return 0;
+	}
 	for (int i = 0; i < num_channels; i++)
 	{
 		chip_channel *ch = &chip_channels[i];
@@ -323,7 +335,33 @@ void chip_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_
 		ch->noise_state = 0x0001;
 		al_unlock_mutex(ch->mutex);
 	}
+
 	printf("[audio] Created channel states at %X\n",(uint16_t)chip_channels);
+	return 1;
+}
+
+void chip_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_t frag_num, uint16_t rate_mul)
+{
+	chip_shutdown();
+
+	chip_rate = rate;
+	chip_num_channels = num_channels;
+	chip_frag_size = frag_size;
+	chip_frag_num = frag_num;
+	chip_rate_mul = rate_mul;
+	
+	if (!chip_arg_sanity(void))
+	{
+		return;
+	}
+	if (!chip_allegro_setup())
+	{
+		return;
+	}
+	if (!chip_channel_init())
+	{
+		return;
+	}
 
 	// Set up defaults for audio engine pointer
 	chip_engine_ptr = NULL;
@@ -333,10 +371,17 @@ void chip_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_
 	// Build the thread
 	chip_thread = al_create_thread(chip_func, NULL);
 	printf("[audio] Created audio thread.\n");
+
+	chip_is_init = 1;
 }
 
 void chip_start(void)
 {
+	if (!chip_is_init)
+	{
+		fprintf(stderr, "[audio] Error: LibChip has not been initialized.\n");
+		return;
+	}
 	al_start_thread(chip_thread);
 	printf("[audio] Started audio thread.\n");
 }
