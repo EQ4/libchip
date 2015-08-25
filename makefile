@@ -1,26 +1,43 @@
-CC := clang
-# CC := gcc # for wingnuts
-CFLAGS := -fvisibility=hidden -std=c99 -O2 -g
-CPPFLAGS := -Iinc
+# libchip
+# Copyright (C) Michael Moffitt 2015
 
-CPPFLAGS := $(CPPFLAGS) -Wall
+# C compiler configuration
+CC := clang
+CFLAGS := -fvisibility=hidden -std=c99 -O2 -g -Wall
+INCLUDE := -Iinc
+
+# Archiver for static building
+AR := ar
+ARFLAGS := rvs
 
 LDFLAGS :=
-LIBRARIES := -lpoly `pkg-config --cflags --static --libs allegro-static-5 allegro_ttf-static-5 allegro_font-static-5 allegro_audio-static-5 allegro_color-static-5 allegro_image-static-5 allegro_main-static-5 allegro_primitives-static-5`
+LIBRARIES := -lallegro -lallegro_audio-static
 
-SOURCES := $(wildcard src/*.c)
-OBJECTS := $(SOURCES:.c=.o)
-EDITOR_EXEC := chiped
+OUTPUT := libchip.a
 
-.PHONY: all clean
+.PHONY: all
 
-all: $(EDITOR_EXEC)
+all: $(OUTPUT)
 
+.PHONY: shared
+shared: libchip.o
+	$(CC) -shared -o libchip.so libchip.o
+
+libchip.a: libchip.o 
+	$(AR) $(ARFLAGS) libchip.a libchip.o
+
+libchip.o: src/libchip.c
+	$(CC) -c $(CFLAGS) $(INCLUDE) -fPIC src/libchip.c
+
+.PHONY: install
+install:
+	cp libchip.a /usr/local/lib/
+	chown root /usr/local/lib/libchip.a
+	chmod 0775 /usr/local/lib/libchip.a
+	cp inc/libchip.h /usr/local/include/
+	chown root /usr/local/include/libchip.h
+	chmod 0775 /usr/local/include/libchip.h
+
+.PHONY: clean
 clean:
-	$(RM) $(OBJECTS) $(EDITOR_EXEC)
-
-$(EDITOR_EXEC): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(CFLAGS) $(OBJECTS) -o $@ $(LIBRARIES)
-
-.c.o:
-	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
+	$(RM) $(OBJECTS) $(OUTPUT)

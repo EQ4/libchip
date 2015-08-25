@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "audio.h"
+#include "libchip.h"
 
 int frames = 0;
 
@@ -31,7 +31,7 @@ static uint16_t fullw[] = {
 
 void printme(void)
 {
-	audio_set_amp(0,0xF * (1.0 - (amp / 30.0)), 0xF * (1.0 - (amp / 30.0)));
+	chip_set_amp(0,0xF * (1.0 - (amp / 30.0)), 0xF * (1.0 - (amp / 30.0)));
 	amp++;
 	if (amp == 30)
 	{
@@ -41,25 +41,25 @@ void printme(void)
 
 int main(int argc, char **argv)
 {
-	audio_init(44100,1,1024,4,512);
+	chip_init(44100,1,1024,4,512);
 	printf("[main] Waiting for stop signal.\n");
 
-	audio_set_engine_ptr(&printme,0);
-	audio_set_wave(0, &wave_saw[0], 32, 1);
-	audio_set_amp(0,0xF,0xF);
-	audio_set_freq(0,40);
-	audio_set_noise(0,1);
-	//audio_set_noise(0,1);
+	chip_set_engine_ptr(&printme,0);
+	chip_set_wave(0, &wave_saw[0], 32, 1);
+	chip_set_amp(0,0xF,0xF);
+	chip_set_freq(0,40);
+	chip_set_noise(0,1);
+	//chip_set_noise(0,1);
 	char c = 0;
 	int f = 32;
-	audio_start();
+	chip_start();
 	while(c != 'z')
 	{
 		c = getchar();
-		audio_set_freq(0,f);
+		chip_set_freq(0,f);
 		f = f * 2;;
 	}
 	printf("%d frames\n",frames);
-	audio_shutdown();
+	chip_shutdown();
 	return 0;
 }
