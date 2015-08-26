@@ -10,14 +10,18 @@ LDFLAGS :=
 AR := ar
 ARFLAGS := cvq
 
-all: libchip.a libchip.o 
+all: libchip.o chipkernel.o libchip.a
+
+chipkernel.o: src/chipkernel.c
+	$(CC) $(CFLAGS) $(INCLUDE) $(LDFLAGS) -c src/chipkernel.c -o chipkernel.o
 
 libchip.o: src/libchip.c
-	$(CC) $(CFLAGS) $(INCLUDE) $(LDFLAGS) -c src/libchip.c -o libchip.a 
+	$(CC) $(CFLAGS) $(INCLUDE) $(LDFLAGS) -c src/libchip.c -o libchip.o
 
-libchip.a: src/libchip.o 
-	$(AR) $(ARFLAGS) libchip.a src/libchip.o
-	rm src/libchip.o
+libchip.a: libchip.o chipkernel.o 
+	$(AR) $(ARFLAGS) libchip.a libchip.o chipkernel.o
+	rm libchip.o
+	rm chipkernel.o
 
 .PHONY: install
 install:
@@ -30,4 +34,4 @@ install:
 
 .PHONY: clean
 clean:
-	$(RM) src/libchip.o libchip.a
+	$(RM) chipkernel.o libchip.o libchip.a
