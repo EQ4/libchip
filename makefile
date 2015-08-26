@@ -3,31 +3,21 @@
 
 # C compiler configuration
 CC := clang
-CFLAGS := -fvisibility=hidden -std=c99 -O2 -g -Wall
-INCLUDE := -Iinc
-
+CFLAGS := -std=c99 -O2 -g -Wall
+INCLUDE := -Iinc 
+LDFLAGS := 
 # Archiver for static building
 AR := ar
-ARFLAGS := rvs
+ARFLAGS := cvq
 
-LDFLAGS :=
-LIBRARIES := -lallegro -lallegro_audio-static
-
-OUTPUT := libchip.a
-
-.PHONY: all
-
-all: $(OUTPUT)
-
-.PHONY: shared
-shared: libchip.o
-	$(CC) -shared -o libchip.so libchip.o
-
-libchip.a: libchip.o 
-	$(AR) $(ARFLAGS) libchip.a libchip.o
+all: libchip.a libchip.o 
 
 libchip.o: src/libchip.c
-	$(CC) -c $(CFLAGS) $(INCLUDE) -fPIC src/libchip.c
+	$(CC) $(CFLAGS) $(INCLUDE) $(LDFLAGS) -c src/libchip.c -o libchip.a 
+
+libchip.a: src/libchip.o 
+	$(AR) $(ARFLAGS) libchip.a src/libchip.o
+	rm src/libchip.o
 
 .PHONY: install
 install:
@@ -40,4 +30,4 @@ install:
 
 .PHONY: clean
 clean:
-	$(RM) $(OBJECTS) $(OUTPUT)
+	$(RM) src/libchip.o libchip.a

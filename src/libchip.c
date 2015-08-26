@@ -229,7 +229,7 @@ static int chip_allegro_setup(void)
 	if (!chip_voice)
 	{
 		fprintf(stderr,"[audio] Error: Failed to create voice.\n");
-		return;
+		return 0;
 	}
 	printf("[audio] Created voice at %X\n",(uint16_t)chip_voice);
 
@@ -314,7 +314,7 @@ static int chip_arg_sanity(void)
 	return 1;
 }
 
-static void chip_channel_init(void)
+static int chip_channel_init(void)
 {
 	// Set up channel state
 	chip_channels = (chip_channel *)calloc(chip_num_channels,sizeof(chip_channel));
@@ -323,7 +323,7 @@ static void chip_channel_init(void)
 		fprintf(stderr,"[audio] Couldn't malloc for channel states. Maybe too many have been requested?\n");
 		return 0;
 	}
-	for (int i = 0; i < num_channels; i++)
+	for (int i = 0; i < chip_num_channels; i++)
 	{
 		chip_channel *ch = &chip_channels[i];
 		ch->period = 1;
@@ -350,7 +350,7 @@ void chip_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_
 	chip_frag_num = frag_num;
 	chip_rate_mul = rate_mul;
 	
-	if (!chip_arg_sanity(void))
+	if (!chip_arg_sanity())
 	{
 		return;
 	}
@@ -388,6 +388,7 @@ void chip_start(void)
 
 void chip_set_engine_ptr(void *ptr, uint32_t p)
 {
+	chip_engine_cnt = 0;
 	chip_engine_ptr = ptr;
 	if (p)
 	{
