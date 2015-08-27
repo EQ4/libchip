@@ -145,14 +145,14 @@ static int chip_arg_sanity(void)
 	printf("[audio] Using %d channels\n",chip_num_channels);
 	if (!chip_frag_size)
 	{
-		fprintf(stderr,"[audio] Warning: No fragment size given. Defaulting to 2048.\n");
-		chip_frag_size = chip_SIZE_FRAGMENT;
+		fprintf(stderr,"[audio] Warning: No fragment size given. Defaulting to 1024.\n");
+		chip_frag_size = CHIP_SIZE_FRAGMENT;
 	}
 	printf("[audio] Using %d for fragment size\n",chip_frag_size);
 	if (!chip_frag_num)
 	{
-		fprintf(stderr,"[audio] Warning: No fragment number given. Defaulting to 2.\n");
-		chip_frag_num = chip_NUM_FRAGMENTS;
+		fprintf(stderr,"[audio] Warning: No fragment number given. Defaulting to 4.\n");
+		chip_frag_num = CHIP_NUM_FRAGMENTS;
 	}
 	printf("[audio] Using %d fragments\n",chip_frag_num);
 	if (!chip_rate_mul)

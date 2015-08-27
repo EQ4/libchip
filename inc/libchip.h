@@ -1,16 +1,16 @@
-#ifndef chip_H
-#define chip_H
+#ifndef CHIP_H
+#define CHIP_H
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_audio.h>
 
-#define chip_NUM_FRAGMENTS 2
-#define chip_SIZE_FRAGMENT 2048
-#define chip_RATE 44100
-#define chip_DEPTH ALLEGRO_AUDIO_DEPTH_INT16
-#define chip_CHAN ALLEGRO_CHANNEL_CONF_2
+#define CHIP_NUM_FRAGMENTS 4
+#define CHIP_SIZE_FRAGMENT 1024
+#define CHIP_RATE 44100
+#define CHIP_DEPTH ALLEGRO_AUDIO_DEPTH_INT16
+#define CHIP_CHAN ALLEGRO_CHANNEL_CONF_2
 
 typedef struct chip_channel chip_channel;
 struct chip_channel
