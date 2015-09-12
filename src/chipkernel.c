@@ -7,17 +7,17 @@ ALLEGRO_MIXER *chip_mixer;
 ALLEGRO_VOICE *chip_voice;
 ALLEGRO_THREAD *chip_thread;
 
-uint16_t chip_rate;
-uint16_t chip_frag_size;
-uint16_t chip_frag_num;
-uint16_t chip_rate_mul;
-uint16_t chip_num_channels;
+unsigned int chip_rate;
+unsigned int chip_frag_size;
+unsigned int chip_frag_num;
+unsigned int chip_rate_mul;
+unsigned int chip_num_channels;
 
 int chip_is_init;
 
 void (*chip_engine_ptr)(void);
-uint32_t chip_engine_cnt;
-uint32_t chip_engine_period;
+unsigned int chip_engine_cnt;
+unsigned int chip_engine_period;
 
 chip_channel *chip_channels;
 
@@ -77,7 +77,7 @@ void chip_step(int16_t *frame)
 		}
 	}
 
-	for (uint16_t i = 0; i < chip_num_channels; i++)
+	for (unsigned int i = 0; i < chip_num_channels; i++)
 	{
 		chip_channel *ch = &chip_channels[i];
 		al_lock_mutex(ch->mutex);
@@ -86,7 +86,7 @@ void chip_step(int16_t *frame)
 		frame_add[1] = 0;
 
 		// Rate multiplier is for oversampling and averaging
-		for (uint16_t k = 0; k < chip_rate_mul; k++)
+		for (unsigned int k = 0; k < chip_rate_mul; k++)
 		{
 			chip_channel_prog(ch);
 			if (ch->noise_en)
@@ -99,7 +99,7 @@ void chip_step(int16_t *frame)
 			}
 		}
 		frame_add[1] = frame_add[0];
-		for (int k = 0; k < 2; k++)
+		for (unsigned int k = 0; k < 2; k++)
 		{
 			// Now we have 0-16
 			frame_add[k] /= chip_rate_mul;
@@ -133,7 +133,7 @@ void* chip_func(ALLEGRO_THREAD *thr, void *arg)
 					frame = (int16_t *)al_get_audio_stream_fragment(chip_stream);
 					if (frame)
 					{
-						for (int i = 0; i < chip_frag_size; i++)
+						for (unsigned int i = 0; i < chip_frag_size; i++)
 						{
 							chip_step(frame + (2*i));
 						}

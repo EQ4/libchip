@@ -12,18 +12,18 @@ extern ALLEGRO_MIXER *chip_mixer;
 extern ALLEGRO_VOICE *chip_voice;
 extern ALLEGRO_THREAD *chip_thread;
 
-extern uint16_t chip_rate;
-extern uint16_t chip_frag_size;
-extern uint16_t chip_frag_num;
-extern uint16_t chip_rate_mul;
-extern uint16_t chip_num_channels;
+extern unsigned int chip_rate;
+extern unsigned int chip_frag_size;
+extern unsigned int chip_frag_num;
+extern unsigned int chip_rate_mul;
+extern unsigned int chip_num_channels;
 
 extern int chip_is_init;
 
 // Libchip state
 extern void (*chip_engine_ptr)(void);
-extern uint32_t chip_engine_cnt;
-extern uint32_t chip_engine_period;
+extern unsigned int chip_engine_cnt;
+extern unsigned int chip_engine_period;
 extern chip_channel *chip_channels;
 
 void chip_noise_step(chip_channel *ch);

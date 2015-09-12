@@ -34,7 +34,7 @@ void chip_shutdown(void)
 	}
 	if (chip_channels)
 	{
-		for (uint16_t i = 0; i < chip_num_channels; i++)
+		for (unsigned int i = 0; i < chip_num_channels; i++)
 		{
 			chip_channel *ch = &chip_channels[i];
 			al_unlock_mutex(ch->mutex);
@@ -80,7 +80,7 @@ static int chip_allegro_setup(void)
 		fprintf(stderr,"[audio] Error: Failed to create voice.\n");
 		return 0;
 	}
-	printf("[audio] Created voice at %X\n",(uint16_t)chip_voice);
+	printf("[audio] Created voice at %X\n",(unsigned int)chip_voice);
 
 	// Mixer
 	chip_mixer = al_create_mixer(chip_rate,
@@ -91,7 +91,7 @@ static int chip_allegro_setup(void)
 		fprintf(stderr,"[audio] Error: Failed to create mixer.\n");
 		return 0;
 	}
-	printf("[audio] Created mixer at %X\n",(uint16_t)chip_mixer);
+	printf("[audio] Created mixer at %X\n",(unsigned int)chip_mixer);
 
 	if (!al_attach_mixer_to_voice(chip_mixer, chip_voice))
 	{
@@ -110,7 +110,7 @@ static int chip_allegro_setup(void)
 		chip_rate,
 		CHIP_DEPTH,
 		CHIP_CHAN);
-	printf("[audio] Created stream at %X\n",(uint16_t)chip_stream);
+	printf("[audio] Created stream at %X\n",(unsigned int)chip_stream);
 	if (!al_attach_audio_stream_to_mixer(chip_stream, al_get_default_mixer()))
 	{
 		printf("[audio] Error: Couldn't attach stream to mixer.\n");
@@ -120,7 +120,7 @@ static int chip_allegro_setup(void)
 
 	// Set up event source for the audio thread
 	chip_queue = al_create_event_queue();
-	printf("[audio] Created queue at %X\n",(uint16_t)chip_queue);
+	printf("[audio] Created queue at %X\n",(unsigned int)chip_queue);
 	al_register_event_source(chip_queue, 
 		al_get_audio_stream_event_source(chip_stream));
 	printf("[audio] Registered audio event source with queue.\n");
@@ -189,7 +189,7 @@ static int chip_channel_init(void)
 	return 1;
 }
 
-void chip_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_t frag_num, uint16_t rate_mul)
+void chip_init(unsigned int rate, unsigned int num_channels, unsigned int frag_size, unsigned int frag_num, unsigned int rate_mul)
 {
 	chip_shutdown();
 
@@ -215,7 +215,7 @@ void chip_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_
 	// Set up defaults for audio engine pointer
 	chip_engine_ptr = NULL;
 	chip_engine_cnt = 0;
-	chip_engine_period = (uint32_t)(chip_rate / 60.00); // Default to 60Hz
+	chip_engine_period = (unsigned int)(chip_rate / 60.00); // Default to 60Hz
 
 	// Build the thread
 	chip_thread = al_create_thread(chip_func, NULL);
@@ -235,13 +235,13 @@ void chip_start(void)
 	printf("[audio] Started audio thread.\n");
 }
 
-void chip_set_engine_ptr(void *ptr, uint32_t p)
+void chip_set_engine_ptr(void *ptr, unsigned int eng_period)
 {
 	chip_engine_cnt = 0;
 	chip_engine_ptr = ptr;
-	if (p)
+	if (eng_period)
 	{
-		chip_engine_period = p;
+		chip_engine_period = eng_period;
 	}
 }
 
@@ -251,7 +251,7 @@ void *chip_get_engine_ptr(void)
 }
 
 /* External control fuctions */
-void chip_set_freq(uint16_t channel, float f)
+void chip_set_freq(unsigned int channel, float f)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -260,7 +260,7 @@ void chip_set_freq(uint16_t channel, float f)
 	}
 	chip_channel *ch = &chip_channels[channel];
 // Resulting frequency: (rate_mul * rate) / (wave_len * period)
-	uint32_t set_p = (uint32_t)((chip_rate_mul * chip_rate) / (ch->wave_len * f));
+	unsigned int set_p = (unsigned int)((chip_rate_mul * chip_rate) / (ch->wave_len * f));
 	if (set_p < 1)
 	{
 		set_p = 1;
@@ -269,7 +269,7 @@ void chip_set_freq(uint16_t channel, float f)
 	printf("[audio] Set channel %d period to %d\n",channel,set_p);
 }
 
-void chip_set_period_direct(uint16_t channel, uint32_t period)
+void chip_set_period_direct(unsigned int channel, unsigned int period)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -284,7 +284,7 @@ void chip_set_period_direct(uint16_t channel, uint32_t period)
 	ch->period = period;
 }
 
-void chip_set_amp(uint16_t channel, uint16_t amp_l, uint16_t amp_r)
+void chip_set_amp(unsigned int channel, unsigned int amp_l, unsigned int amp_r)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -296,7 +296,7 @@ void chip_set_amp(uint16_t channel, uint16_t amp_l, uint16_t amp_r)
 	ch->amplitude[1] = amp_r;
 }
 
-void chip_set_noise(uint16_t channel, uint16_t noise_en)
+void chip_set_noise(unsigned int channel, unsigned int noise_en)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -307,7 +307,7 @@ void chip_set_noise(uint16_t channel, uint16_t noise_en)
 	ch->noise_en = noise_en;
 }
 
-void chip_set_loop(uint16_t channel, uint16_t loop_en)
+void chip_set_loop(unsigned int channel, unsigned int loop_en)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -319,7 +319,7 @@ void chip_set_loop(uint16_t channel, uint16_t loop_en)
 }
 
 // Point to user-owned wave data
-void chip_set_wave(uint16_t channel, uint16_t *wave_data, uint16_t len, uint16_t loop_en)
+void chip_set_wave(unsigned int channel, uint16_t *wave_data, unsigned int len, unsigned int loop_en)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -342,7 +342,7 @@ void chip_set_wave(uint16_t channel, uint16_t *wave_data, uint16_t len, uint16_t
 }
 
 // Create a buffer for wave data owned by the library
-void chip_create_wave(uint16_t channel, uint16_t len, uint16_t loop_en)
+void chip_create_wave(unsigned int channel, unsigned int len, unsigned int loop_en)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -369,7 +369,7 @@ void chip_create_wave(uint16_t channel, uint16_t len, uint16_t loop_en)
 	al_unlock_mutex(ch->mutex);
 }
 
-void chip_set_wave_pos(uint16_t channel, uint16_t pos)
+void chip_set_wave_pos(unsigned int channel, unsigned int pos)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -380,7 +380,7 @@ void chip_set_wave_pos(uint16_t channel, uint16_t pos)
 	ch->wave_pos = pos;
 }
 
-void chip_set_noise_tap(uint16_t channel, uint16_t tap)
+void chip_set_noise_tap(unsigned int channel, unsigned int tap)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -395,7 +395,7 @@ void chip_set_noise_tap(uint16_t channel, uint16_t tap)
 	ch->noise_tap = tap;
 }
 
-uint16_t chip_get_period(uint32_t channel)
+unsigned int chip_get_period(unsigned int channel)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -405,7 +405,7 @@ uint16_t chip_get_period(uint32_t channel)
 	chip_channel *ch = &chip_channels[channel];
 	return ch->period;
 }
-uint16_t chip_get_amp(uint16_t channel, uint16_t side)
+unsigned int chip_get_amp(unsigned int channel, unsigned int side)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -416,7 +416,7 @@ uint16_t chip_get_amp(uint16_t channel, uint16_t side)
 	return ch->amplitude[side % 2];
 }
 
-uint16_t chip_get_noise(uint16_t channel)
+unsigned int chip_get_noise(unsigned int channel)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -427,7 +427,7 @@ uint16_t chip_get_noise(uint16_t channel)
 	return ch->noise_en;
 }
 
-uint16_t chip_get_loop(uint16_t channel)
+unsigned int chip_get_loop(unsigned int channel)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -438,7 +438,7 @@ uint16_t chip_get_loop(uint16_t channel)
 	return ch->loop_en;
 }
 
-uint16_t *chip_get_wave(uint16_t channel)
+uint16_t *chip_get_wave(unsigned int channel)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -449,7 +449,7 @@ uint16_t *chip_get_wave(uint16_t channel)
 	return ch->wave_data;
 }
 
-uint16_t chip_get_wave_len(uint16_t channel)
+unsigned int chip_get_wave_len(unsigned int channel)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -460,7 +460,7 @@ uint16_t chip_get_wave_len(uint16_t channel)
 	return ch->wave_len;
 }
 
-chip_channel *chip_get_channel(uint16_t channel)
+chip_channel *chip_get_channel(unsigned int channel)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -470,7 +470,7 @@ chip_channel *chip_get_channel(uint16_t channel)
 	return &chip_channels[channel];
 }
 
-uint16_t chip_get_wave_pos(uint16_t channel)
+unsigned int chip_get_wave_pos(unsigned int channel)
 {
 	if (channel >= chip_num_channels)
 	{
@@ -481,7 +481,7 @@ uint16_t chip_get_wave_pos(uint16_t channel)
 	return ch->wave_pos;
 }
 
-uint16_t chip_get_noise_tap(uint16_t channel)
+unsigned int chip_get_noise_tap(unsigned int channel)
 {
 	if (channel >= chip_num_channels)
 	{

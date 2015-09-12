@@ -16,44 +16,44 @@ typedef struct chip_channel chip_channel;
 struct chip_channel
 {
 	ALLEGRO_MUTEX *mutex; // Lock for reading/writing wave data
+	uint16_t *wave_data; // Pointer to wave nybbles array
 	uint32_t period; // Division of sample rate / rate multiplier.
 	uint32_t counter; // Countdown until wave pos increment
-	uint16_t amplitude[2]; // Left and right amplitude;
-	uint16_t *wave_data; // Pointer to wave nybbles array
-	uint16_t own_wave; // Mark if it should be destroyed
-	uint16_t wave_len; // Number of samples in the wave
-	uint16_t wave_pos; // Pointer within wave
-	uint16_t loop_en; // Will the wave loop at the end or stop playing?
-	uint16_t noise_en; // When nonzero, make LSFR noise like NES APU
-	uint16_t noise_state;
-	uint16_t noise_tap;
+	unsigned int amplitude[2]; // Left and right amplitude;
+	unsigned int own_wave; // Mark if it should be destroyed
+	unsigned int wave_len; // Number of samples in the wave
+	unsigned int wave_pos; // Pointer within wave
+	unsigned int loop_en; // Will the wave loop at the end or stop playing?
+	unsigned int noise_en; // When nonzero, make LSFR noise like NES APU
+	unsigned int noise_state;
+	unsigned int noise_tap;
 };
 
 void chip_shutdown(void);
-void chip_init(uint16_t rate, uint16_t num_channels, uint16_t frag_size, uint16_t frag_num, uint16_t rate_mul);
+void chip_init(unsigned int rate, unsigned int num_channels, unsigned int frag_size, unsigned int frag_num, unsigned int rate_mul);
 void chip_start(void);
 
 void chip_set_engine_ptr(void *ptr, uint32_t p);
 void *chip_get_engine_ptr(void);
 
-void chip_set_freq(uint16_t channel, float f);
-void chip_set_period_direct(uint16_t channel, uint32_t period);
-void chip_set_amp(uint16_t channel, uint16_t amp_l, uint16_t amp_r);
-void chip_set_noise(uint16_t channel, uint16_t noise_en);
-void chip_set_loop(uint16_t channel, uint16_t loop_en);
-void chip_set_wave(uint16_t channel, uint16_t *wave_data, uint16_t len, uint16_t loop_en);
-void chip_create_wave(uint16_t channel, uint16_t len, uint16_t loop_en);
-void chip_set_wave_pos(uint16_t channel, uint16_t pos);
-void chip_set_noise_tap(uint16_t channel, uint16_t tap);
+void chip_set_freq(unsigned int channel, float f);
+void chip_set_period_direct(unsigned int channel, uint32_t period);
+void chip_set_amp(unsigned int channel, unsigned int amp_l, unsigned int amp_r);
+void chip_set_noise(unsigned int channel, unsigned int noise_en);
+void chip_set_loop(unsigned int channel, unsigned int loop_en);
+void chip_set_wave(unsigned int channel, uint16_t *wave_data, unsigned int len, unsigned int loop_en);
+void chip_create_wave(unsigned int channel, unsigned int len, unsigned int loop_en);
+void chip_set_wave_pos(unsigned int channel, unsigned int pos);
+void chip_set_noise_tap(unsigned int channel, unsigned int tap);
 
-uint16_t chip_get_period(uint32_t channel);
-uint16_t chip_get_amp(uint16_t channel, uint16_t side);
-uint16_t chip_get_noise(uint16_t channel);
-uint16_t chip_get_loop(uint16_t channel);
-uint16_t *chip_get_wave(uint16_t channel);
-uint16_t chip_get_wave_len(uint16_t channel);
-chip_channel *chip_get_channel(uint16_t channel);
-uint16_t chip_get_wave_pos(uint16_t channel);
-uint16_t chip_get_noise_tap(uint16_t channel);
+unsigned int chip_get_period(uint32_t channel);
+unsigned int chip_get_amp(unsigned int channel, unsigned int side);
+unsigned int chip_get_noise(unsigned int channel);
+unsigned int chip_get_loop(unsigned int channel);
+uint16_t *chip_get_wave(unsigned int channel);
+unsigned int chip_get_wave_len(unsigned int channel);
+chip_channel *chip_get_channel(unsigned int channel);
+unsigned int chip_get_wave_pos(unsigned int channel);
+unsigned int chip_get_noise_tap(unsigned int channel);
 
 #endif
