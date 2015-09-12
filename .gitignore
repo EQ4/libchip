@@ -37,3 +37,5 @@ src/*.o
 inc/*.swp
 
 chiped
+
+examples/wavetest

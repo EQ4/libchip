@@ -73,8 +73,8 @@ static int chip_allegro_setup(void)
 	printf("[audio] Audio addon is installed\n");
 	// Voice
 	chip_voice = al_create_voice(chip_rate,
-		chip_DEPTH,
-		chip_CHAN);
+		CHIP_DEPTH,
+		CHIP_CHAN);
 	if (!chip_voice)
 	{
 		fprintf(stderr,"[audio] Error: Failed to create voice.\n");
@@ -84,8 +84,8 @@ static int chip_allegro_setup(void)
 
 	// Mixer
 	chip_mixer = al_create_mixer(chip_rate,
-		chip_DEPTH,
-		chip_CHAN);
+		CHIP_DEPTH,
+		CHIP_CHAN);
 	if (!chip_mixer)
 	{
 		fprintf(stderr,"[audio] Error: Failed to create mixer.\n");
@@ -108,8 +108,8 @@ static int chip_allegro_setup(void)
 		chip_frag_num,
 		chip_frag_size,
 		chip_rate,
-		chip_DEPTH,
-		chip_CHAN);
+		CHIP_DEPTH,
+		CHIP_CHAN);
 	printf("[audio] Created stream at %X\n",(uint16_t)chip_stream);
 	if (!al_attach_audio_stream_to_mixer(chip_stream, al_get_default_mixer()))
 	{

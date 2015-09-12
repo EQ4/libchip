@@ -16,5 +16,5 @@ all: wavetest
 clean:
 	rm wavetest wavetest.o
 
-wavetest: wavetest.c
-	$(CC) $(CFLAGS) wavetest.c -o $(EXEC) $(LIBS)
+wavetest: main.c
+	$(CC) $(CFLAGS) main.c -o $(EXEC) $(LIBS)
